@@ -1,0 +1,9 @@
+# dependencies
+node_modules/
+package-lock.json
+
+# sc runtime state — personal, not committed
+.claude/session.md
+.claude/session.md.tmp
+.claude/session-checkpoint.md
+.claude/settings.local.json

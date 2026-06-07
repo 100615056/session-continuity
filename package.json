@@ -1,0 +1,41 @@
+{
+  "name": "session-continuity",
+  "version": "0.1.2",
+  "description": "Pick up where you left off across Claude sessions — zero re-explanation.",
+  "bin": {
+    "sc": "./dist/cli.js",
+    "sc-mcp": "./dist/server.js"
+  },
+  "type": "module",
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "node build.js",
+    "prepare": "node build.js",
+    "test": "node --test src/*.test.js"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "keywords": [
+    "mcp",
+    "claude",
+    "claude-code",
+    "session",
+    "context",
+    "memory",
+    "continuity",
+    "ai-native",
+    "workflow",
+    "developer-tools"
+  ],
+  "license": "MIT",
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.29.0",
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "esbuild": "^0.28.0"
+  }
+}

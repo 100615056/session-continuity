@@ -1,0 +1,67 @@
+# Measure
+
+**Goal:** Build a session continuity tool for AI-native development workflows that helps developers pick up where they left off across Claude sessions without re-explaining context. The tool should capture, store, and restore session state so each new Claude session starts with full context of what was happening, what decisions were made, and what's next.
+
+---
+
+## Success criteria scorecard
+
+| Criterion | Status | Evidence |
+|-----------|--------|----------|
+| Starting a new Claude session auto-loads full context — no manual pasting or summarizing | ✅ Met | `sc init` wires `@.claude/session.md` into CLAUDE.md once; every subsequent session auto-injects context. Live test confirmed: new session opened with previous session visible in first response, zero user action. |
+| Why-choices (architecture, tradeoffs, rejected ideas) survive across sessions | ⚠️ Partial | `claude -p` narrative captures a "Decisions made" field with reasoning. Works well when: claude CLI is available AND session changes are visible in git diff. Misses: pure-conversation decisions not reflected in code, decisions from sessions older than 3 (rolling window drops them), crashes (Stop hook won't fire). |
+| Every session ends with a written "next steps" block that becomes the opener of the following session | ✅ Met | Narrative prompt template requires a structured "Next steps" field. Live test produced a correct, actionable next-steps block. Caveat: degrades to objective-only (no next steps) if `claude -p` is unavailable or session ends via crash. |
+| Integrates into existing Claude Code CLI workflow (hooks, CLAUDE.md, memory) — no new UI | ✅ Met | Uses `.claude/settings.json` Stop hook, CLAUDE.md `@import`, and `claude -p` headless CLI. No daemon, no GUI, no browser. One-time `sc init` setup, everything else automatic. |
+
+---
+
+## Overall verdict
+
+**Verdict:** ⚠️ Partially met — 3 of 4 criteria fully met, 1 partial
+
+**Summary:** The core workflow works end-to-end and the tool is genuinely useful: zero-friction context injection is fully solved, next-steps handoff works reliably when `claude -p` is available, and it slots into Claude Code with no new UI. The partial criterion — why-choices surviving sessions — is limited by three real gaps: the rolling window drops decisions older than 3 sessions, crash exits skip the snapshot entirely, and decisions made purely in conversation (not reflected in git state) are invisible to `claude -p`. These are v2 targets, not blockers for shipping.
+
+---
+
+## What worked well
+- **Zero-friction ingestion** — CLAUDE.md `@import` is the right primitive; it just works with no per-session action
+- **Graceful degradation** — objective git snapshot always writes even when `claude -p` fails; nothing is silently lost
+- **Atomic write** — no partial/corrupt files in any tested failure scenario
+- **Idempotent init** — safe to run `sc init` in any project repeatedly; no duplicate hooks or imports
+- **Narrative quality** — `claude -p` output was immediately useful; correctly identified project state and suggested right next steps in live test
+- **Test coverage** — 23/23 automated tests; all edge cases (no git, rolling window, existing hooks, idempotency) covered
+
+## What fell short
+- **Crash safety** — if Claude is force-quit, the Stop hook never fires and the session is lost. `sc rotate` is the manual workaround but requires discipline.
+- **Pure-conversation decisions not captured** — if a key architectural decision is made in chat but not committed to code, `claude -p` has no signal to work from
+- **3-session rolling window is aggressive** — long-running projects will lose context from earlier sessions. No way to pin an important decision permanently.
+- **`claude -p` latency** — narrative generation adds ~4s to session end. Acceptable but noticeable.
+- **README not yet written** — tool is not yet installable via npm; M3 is incomplete
+
+---
+
+## Quantitative signals
+
+| Metric | Target | Actual | Pass? |
+|--------|--------|--------|-------|
+| Automated test pass rate | 100% | 23/23 = 100% | ✅ |
+| Max snapshot token budget | ≤ 800 tokens | ~600 tokens (3 × ~200) | ✅ |
+| `sc snapshot` wall time (with `claude -p`) | < 20s | ~4–5s | ✅ |
+| `sc snapshot` wall time (without `claude -p`) | < 2s | < 1s | ✅ |
+| `sc init` setup steps for user | ≤ 2 commands | 1 command (`sc init`) | ✅ |
+| Duplicate hook/import after 2× init | 0 | 0 | ✅ |
+| Files left behind on crash (tmp) | 0 | 0 | ✅ |
+| M3 complete (README + npm publish) | Done | ❌ Not yet | ❌ |
+
+---
+
+## Remaining before "fully met"
+
+1. **Write README.md** — install + quickstart + how it works + troubleshooting
+2. **Publish to npm** as `session-continuity` with `sc` bin alias
+3. **v2 backlog** (not blocking ship):
+   - Incremental `PostToolUse` checkpoint for crash safety
+   - Pinned/permanent decision log that survives rolling window
+   - `sc decide "reason"` CLI command to manually append a decision mid-session
+
+_Generated by edp_measure — 2026-05-25T02:34:37.922Z (filled with real assessment)_

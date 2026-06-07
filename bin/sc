@@ -1,0 +1,51 @@
+#!/usr/bin/env node
+
+import { init } from '../src/init.js';
+import { snapshot } from '../src/snapshot.js';
+import { status } from '../src/status.js';
+import { clear } from '../src/clear.js';
+import { rotate } from '../src/rotate.js';
+import { decide } from '../src/decide.js';
+
+const [, , cmd, ...args] = process.argv;
+
+const commands = { init, snapshot, status, clear, rotate, decide };
+
+if (!cmd || cmd === '--help' || cmd === '-h') {
+  console.log(`
+sc — session continuity for Claude Code
+
+Commands:
+  sc init              Wire up this project (run once per project)
+  sc snapshot          Write a session snapshot (called automatically by Stop hook)
+  sc status            Show the current session state
+  sc clear             Reset session history
+  sc rotate            Manually trigger a snapshot write (use before force-quit)
+  sc decide "<why>"    Pin a permanent decision that survives the rolling window
+
+Options:
+  --version, -v  Print version
+  --help, -h     Show this help
+`);
+  process.exit(0);
+}
+
+if (cmd === '--version' || cmd === '-v') {
+  const { createRequire } = await import('module');
+  const require = createRequire(import.meta.url);
+  const pkg = require('../package.json');
+  console.log(pkg.version);
+  process.exit(0);
+}
+
+if (!commands[cmd]) {
+  console.error(`Unknown command: ${cmd}. Run 'sc --help' for usage.`);
+  process.exit(1);
+}
+
+try {
+  await commands[cmd](args);
+} catch (err) {
+  console.error(`sc ${cmd} failed:`, err.message);
+  process.exit(1);
+}
