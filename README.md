@@ -145,4 +145,4 @@ claude mcp add waypoint npx @waycraft/waypoint-mcp
 
 ## License
 
-MIT
+[PolyForm Noncommercial License 1.0](https://polyformproject.org/licenses/noncommercial/1.0.0/) — free for personal and non-commercial use.
