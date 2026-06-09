@@ -143,6 +143,14 @@ claude mcp add waypoint npx @waycraft/waypoint-mcp
 
 ---
 
+## Feedback & Discussion
+
+Something didn't work, felt missing, or you found a better workflow?
+
+→ [GitHub Discussions](https://github.com/explorenav-dev/session-continuity/discussions)
+
+---
+
 ## License
 
 [PolyForm Noncommercial License 1.0](https://polyformproject.org/licenses/noncommercial/1.0.0/) — free for personal and non-commercial use.
