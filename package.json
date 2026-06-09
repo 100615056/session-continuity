@@ -3,8 +3,8 @@
   "version": "0.1.4",
   "description": "Pick up where you left off across Claude sessions — zero re-explanation.",
   "bin": {
-    "sc": "./dist/cli.js",
-    "sc-mcp": "./dist/server.js"
+    "sc": "dist/cli.js",
+    "sc-mcp": "dist/server.js"
   },
   "type": "module",
   "files": [
