@@ -1,6 +1,6 @@
 {
   "name": "session-continuity",
-  "version": "0.1.6",
+  "version": "0.1.7",
   "description": "Pick up where you left off across Claude sessions — zero re-explanation.",
   "bin": {
     "sc": "dist/cli.js",

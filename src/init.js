@@ -39,26 +39,41 @@ export async function init() {
     steps.push('· CLAUDE.md already has @import');
   }
 
-  // 4. Upsert Stop hook into .claude/settings.json
+  // 4. Upsert Stop + PreCompact hooks into .claude/settings.json
   const settings = readJson(SETTINGS_FILE, {});
   const hook = { type: 'command', command: 'sc snapshot' };
 
   if (!settings.hooks) settings.hooks = {};
-  if (!settings.hooks.Stop) settings.hooks.Stop = [];
 
-  const alreadyWired = settings.hooks.Stop.some(
+  // Stop hook
+  if (!settings.hooks.Stop) settings.hooks.Stop = [];
+  const stopWired = settings.hooks.Stop.some(
     (entry) =>
       Array.isArray(entry.hooks) &&
       entry.hooks.some((h) => h.command && h.command.includes('sc snapshot'))
   );
-
-  if (!alreadyWired) {
+  if (!stopWired) {
     settings.hooks.Stop.push({ hooks: [hook] });
-    writeJson(SETTINGS_FILE, settings);
     steps.push('✓ Stop hook registered in .claude/settings.json');
   } else {
     steps.push('· Stop hook already registered');
   }
+
+  // PreCompact hook
+  if (!settings.hooks.PreCompact) settings.hooks.PreCompact = [];
+  const preCompactWired = settings.hooks.PreCompact.some(
+    (entry) =>
+      Array.isArray(entry.hooks) &&
+      entry.hooks.some((h) => h.command && h.command.includes('sc snapshot'))
+  );
+  if (!preCompactWired) {
+    settings.hooks.PreCompact.push({ hooks: [hook] });
+    steps.push('✓ PreCompact hook registered in .claude/settings.json');
+  } else {
+    steps.push('· PreCompact hook already registered');
+  }
+
+  writeJson(SETTINGS_FILE, settings);
 
   // 5. Check for claude CLI
   let claudeAvailable = false;
