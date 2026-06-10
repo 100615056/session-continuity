@@ -14,14 +14,15 @@ Open a project in Claude Code and start working. That's it.
 
 ## How it works
 
-Claude calls four MCP tools — you do nothing.
+Claude calls five MCP tools — you do nothing.
 
 | Tool | When | What it does |
 |---|---|---|
 | `load_session` | Session start | Restores context — status, decisions, next steps, branch |
-| `save_session` | Session end | Captures an AI-generated snapshot of what happened |
-| `pin_decision` | During session | Records key architectural choices that never expire |
-| `list_projects` | On demand | Shows all projects with session history |
+| `save_session` | Session end | Captures a snapshot of what happened — status, decisions, next steps, blockers, branch. Example: `save_session({ status: "Auth done", decisions: ["JWT over sessions"], next_steps: ["Add refresh tokens"], blockers: "None" })` |
+| `pin_decision` | Mid-session | Records key architectural choices the moment they're made — persists even if `save_session` is never called |
+| `list_projects` | On demand | Shows all projects with session history and last-saved timestamps |
+| `delete_session_permanently` | On demand | Fully erases Claude's memory of a project — irreversible, no undo |
 
 One-time setup. Claude handles load and save automatically, every session.
 
@@ -75,6 +76,20 @@ Up to 3 sessions are kept. Older sessions roll off. Pinned decisions never expir
 
 ---
 
+## `pin_decision` vs `save_session`
+
+`save_session` is a snapshot at the end of a session. `pin_decision` is a safety net during one — it records a choice the moment it's made so it's safe even if the session ends unexpectedly. Pinned decisions also never get pruned; they persist indefinitely, unlike session history which rolls off after 3 sessions.
+
+Call it as soon as you reach a meaningful fork. Claude does this automatically.
+
+## `delete_session_permanently`
+
+Completely erases all session memory for a project — context, decisions, history. Use when the old context is actively wrong or the project has fundamentally changed direction. **There is no undo.** Claude will warn you before calling it.
+
+If you just want to update what Claude knows, use `save_session` with fresh content instead.
+
+---
+
 ## Pinning decisions
 
 Use `sc decide` to record architectural choices, tradeoffs, or rejected ideas that should survive past the 3-session rolling window:
@@ -122,14 +137,18 @@ Run `sc rotate` manually to write a snapshot from the current git state.
 
 ---
 
-## Pairs with Waypoint
+## Pairs with
 
-Session continuity captures *where you left off*. [Waypoint](https://github.com/explorenav-dev/waypoint-mcp) captures *where you are in the process* — across 14 guided development steps from first idea to ship.
-
-Together: Claude knows both what was being worked on and where it sits in the dev journey. No manual briefing, ever.
+**[Waypoint](https://www.npmjs.com/package/@waycraft/waypoint-mcp)** — session-continuity captures *where you left off*. Waypoint captures *where you are in the process* — across 14 guided steps from first idea to ship. Together, Claude knows both what was being worked on and where it sits in the build journey.
 
 ```bash
 claude mcp add waypoint npx @waycraft/waypoint-mcp
+```
+
+**[@waycraft/mcp-manager](https://www.npmjs.com/package/@waycraft/mcp-manager)** — if session-continuity drops mid-session, mcp-manager can restart it without leaving the conversation. No lost context.
+
+```bash
+claude mcp add mcp-manager npx @waycraft/mcp-manager
 ```
 
 ---

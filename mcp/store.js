@@ -3,7 +3,7 @@
  * Each file holds: { path, name, pinned: [], sessions: [] }
  */
 
-import { existsSync, readFileSync, readdirSync, mkdirSync } from 'fs';
+import { existsSync, readFileSync, readdirSync, mkdirSync, unlinkSync } from 'fs';
 import { join, basename } from 'path';
 import { homedir } from 'os';
 import { createHash } from 'crypto';
@@ -53,6 +53,13 @@ export function addPinnedDecision(projectPath, text) {
   store.pinned.push({ text, timestamp: new Date().toISOString() });
   saveStore(projectPath, store);
   return store;
+}
+
+export function deleteStore(projectPath) {
+  const file = storePath(projectPath);
+  if (!existsSync(file)) return false;
+  unlinkSync(file);
+  return true;
 }
 
 export function listAllProjects() {
