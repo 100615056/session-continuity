@@ -30,7 +30,8 @@
     "workflow",
     "developer-tools"
   ],
-  "license": "PolyForm-Noncommercial-1.0.0",
+  "author": "Angelica Cusipag",
+  "license": "MIT",
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.29.0",
     "zod": "^4.4.3"
