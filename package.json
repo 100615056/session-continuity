@@ -1,6 +1,11 @@
 {
   "name": "session-continuity",
-  "version": "0.2.1",
+  "version": "0.2.3",
+  "mcpName": "io.github.100615056/session-continuity",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/100615056/session-continuity.git"
+  },
   "description": "Pick up where you left off across Claude sessions — zero re-explanation.",
   "bin": {
     "sc": "dist/cli.js",
