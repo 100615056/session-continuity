@@ -80,6 +80,10 @@ server.tool(
       lines.push('');
     }
 
+    if (store.pinned.length > 0 && store.sessions.length > 0) {
+      lines.push('---', '');
+    }
+
     store.sessions.forEach((s, i) => {
       lines.push(`## ${i === 0 ? 'Last session' : `Session ${i + 1} ago`} — ${s.timestamp}`);
       lines.push(`**Branch:** ${s.branch}`);

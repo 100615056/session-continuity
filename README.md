@@ -72,7 +72,18 @@ Add to `~/.codeium/windsurf/mcp_config.json`:
 
 ## How it works
 
-Claude calls five MCP tools — you do nothing.
+```
+Session 1 ends          Session 2 starts
+     │                        │
+     ▼                        ▼
+ save_session()          load_session()
+     │                        │
+     ▼                        ▼
+ ~/.sc/sessions/     ──►  Context restored
+ (JSON on disk)           (zero re-explanation)
+```
+
+Claude calls the MCP tools — you do nothing.
 
 | Tool | When | What it does |
 |---|---|---|
@@ -201,9 +212,11 @@ Run `sc rotate` manually to write a snapshot from the current git state.
 
 ---
 
-## Pairs with
+## Part of the Waycraft MCP Suite
 
-**[Waypoint](https://www.npmjs.com/package/@waycraft/waypoint-mcp)** — session-continuity captures *where you left off*. Waypoint captures *where you are in the process* — across 14 guided steps from first idea to ship. Together, Claude knows both what was being worked on and where it sits in the build journey.
+session-continuity is the **foundation layer** — every other tool in the suite benefits from persistent context across sessions.
+
+**[Waypoint](https://www.npmjs.com/package/@waycraft/waypoint-mcp)** — session-continuity captures *where you left off*. Waypoint captures *where you are in the process* — across 16 guided steps from first idea to ship. Together, Claude knows both what was being worked on and where it sits in the build journey.
 
 ```bash
 claude mcp add waypoint npx @waycraft/waypoint-mcp
