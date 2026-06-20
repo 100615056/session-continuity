@@ -6,10 +6,28 @@ import { status } from '../src/status.js';
 import { clear } from '../src/clear.js';
 import { rotate } from '../src/rotate.js';
 import { decide } from '../src/decide.js';
+import { runDoctor } from '../mcp/store.js';
 
 const [, , cmd, ...args] = process.argv;
 
-const commands = { init, snapshot, status, clear, rotate, decide };
+function doctor() {
+  const checks = runDoctor();
+  const allOk = checks.every(c => c.ok);
+  console.log(allOk ? '✅ All checks passed\n' : '⚠️  Issues found\n');
+  for (const c of checks) {
+    console.log(`${c.ok ? '✅' : '❌'} ${c.name}: ${c.detail}`);
+  }
+  const orphanCheck = checks.find(c => c.name === 'Orphaned sessions' && !c.ok);
+  if (orphanCheck?.orphaned) {
+    console.log('\nTo fix orphaned sessions, run:');
+    for (const o of orphanCheck.orphaned) {
+      console.log(`  npx session-continuity migrate "${o.path}" "<new-path>"`);
+    }
+  }
+  if (!allOk) process.exit(1);
+}
+
+const commands = { init, snapshot, status, clear, rotate, decide, doctor };
 
 if (!cmd || cmd === '--help' || cmd === '-h') {
   console.log(`
@@ -22,6 +40,7 @@ Commands:
   sc clear             Reset session history
   sc rotate            Manually trigger a snapshot write (use before force-quit)
   sc decide "<why>"    Pin a permanent decision that survives the rolling window
+  sc doctor            Check setup health: directory, data integrity, orphaned sessions
 
 Options:
   --version, -v  Print version

@@ -3,7 +3,7 @@
  * Each file holds: { path, name, pinned: [], sessions: [] }
  */
 
-import { existsSync, readFileSync, readdirSync, mkdirSync, unlinkSync, renameSync } from 'fs';
+import { existsSync, readFileSync, readdirSync, mkdirSync, unlinkSync, renameSync, accessSync, constants } from 'fs';
 import { join, basename } from 'path';
 import { homedir } from 'os';
 import { createHash } from 'crypto';
@@ -74,6 +74,67 @@ export function migrateStore(oldPath, newPath) {
   atomicWrite(newFile, JSON.stringify(store, null, 2) + '\n');
   unlinkSync(oldFile);
   return { migrated: true, sessions: store.sessions.length, pinned: store.pinned?.length ?? 0 };
+}
+
+export function runDoctor() {
+  const checks = [];
+
+  // 1. Sessions directory
+  try {
+    ensureStore();
+    accessSync(SC_DIR, constants.W_OK);
+    checks.push({ name: 'Sessions directory', ok: true, detail: SC_DIR });
+  } catch {
+    checks.push({ name: 'Sessions directory', ok: false, detail: `Not writable: ${SC_DIR}` });
+  }
+
+  // 2. Session files
+  let files = [];
+  try {
+    files = readdirSync(SC_DIR).filter(f => f.endsWith('.json'));
+    checks.push({ name: 'Session files', ok: true, detail: `${files.length} project(s) tracked` });
+  } catch {
+    checks.push({ name: 'Session files', ok: false, detail: 'Cannot read sessions directory' });
+  }
+
+  // 3. Parse all files, find orphans and corruption
+  const orphaned = [];
+  const corrupt = [];
+  let latestTimestamp = null;
+  for (const f of files) {
+    try {
+      const store = JSON.parse(readFileSync(join(SC_DIR, f), 'utf8'));
+      if (store.path && !existsSync(store.path)) {
+        orphaned.push({ name: store.name, path: store.path });
+      }
+      const last = store.sessions?.[0]?.timestamp;
+      if (last && (!latestTimestamp || last > latestTimestamp)) latestTimestamp = last;
+    } catch {
+      corrupt.push(f);
+    }
+  }
+
+  if (corrupt.length > 0) {
+    checks.push({ name: 'Data integrity', ok: false, detail: `${corrupt.length} corrupt file(s): ${corrupt.join(', ')}` });
+  } else {
+    checks.push({ name: 'Data integrity', ok: true, detail: 'All session files parse correctly' });
+  }
+
+  if (orphaned.length > 0) {
+    checks.push({ name: 'Orphaned sessions', ok: false, detail: `${orphaned.length} project(s) no longer exist on disk`, orphaned });
+  } else {
+    checks.push({ name: 'Orphaned sessions', ok: true, detail: 'All tracked projects exist on disk' });
+  }
+
+  // 4. Last activity
+  if (latestTimestamp) {
+    const daysAgo = Math.floor((Date.now() - new Date(latestTimestamp).getTime()) / 86400000);
+    checks.push({ name: 'Last activity', ok: daysAgo < 30, detail: daysAgo === 0 ? 'Today' : `${daysAgo} day(s) ago` });
+  } else {
+    checks.push({ name: 'Last activity', ok: true, detail: 'No sessions saved yet' });
+  }
+
+  return checks;
 }
 
 export function listAllProjects() {

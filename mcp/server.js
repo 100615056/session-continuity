@@ -4,7 +4,7 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { z } from 'zod';
 import { execSync } from 'child_process';
-import { loadStore, addSession, addPinnedDecision, deleteStore, listAllProjects, migrateStore } from './store.js';
+import { loadStore, addSession, addPinnedDecision, deleteStore, listAllProjects, migrateStore, runDoctor } from './store.js';
 
 import { createRequire } from 'module';
 const { version } = createRequire(import.meta.url)('../package.json');
@@ -264,6 +264,33 @@ server.tool(
       }
       lines.push('');
     });
+
+    return { content: [{ type: 'text', text: lines.join('\n') }] };
+  }
+);
+
+// ── doctor ────────────────────────────────────────────────────────────────────
+
+server.tool(
+  'doctor',
+  'Run diagnostics on the session-continuity setup. Checks: sessions directory writable, data integrity, orphaned sessions (renamed projects), last activity age. Use when load_session returns unexpected results.',
+  {},
+  async () => {
+    const checks = runDoctor();
+    const allOk = checks.every(c => c.ok);
+    const lines = [
+      allOk ? '✅ All checks passed' : '⚠️ Issues found',
+      '',
+      ...checks.map(c => `${c.ok ? '✅' : '❌'} **${c.name}:** ${c.detail}`),
+    ];
+
+    const orphanCheck = checks.find(c => c.name === 'Orphaned sessions' && !c.ok);
+    if (orphanCheck?.orphaned) {
+      lines.push('', '**To fix orphaned sessions**, run `migrate_project` with the old and new paths:');
+      for (const o of orphanCheck.orphaned) {
+        lines.push(`  • "${o.name}" was at \`${o.path}\``);
+      }
+    }
 
     return { content: [{ type: 'text', text: lines.join('\n') }] };
   }
