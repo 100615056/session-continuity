@@ -161,6 +161,12 @@ Pinned decisions appear at the top of `session.md` and are never trimmed.
 
 ---
 
+## Security note
+
+Session data is stored as **plaintext** in `~/.sc/sessions/`. Do not include secrets, API keys, passwords, or credentials in session status, decisions, or next_steps fields. The data is local to your machine and never transmitted, but it is not encrypted.
+
+---
+
 ## .gitignore recommendation
 
 Session state is personal — add this to your project's `.gitignore`:
