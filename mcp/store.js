@@ -3,7 +3,7 @@
  * Each file holds: { path, name, pinned: [], sessions: [] }
  */
 
-import { existsSync, readFileSync, readdirSync, mkdirSync, unlinkSync } from 'fs';
+import { existsSync, readFileSync, readdirSync, mkdirSync, unlinkSync, renameSync } from 'fs';
 import { join, basename } from 'path';
 import { homedir } from 'os';
 import { createHash } from 'crypto';
@@ -60,6 +60,20 @@ export function deleteStore(projectPath) {
   if (!existsSync(file)) return false;
   unlinkSync(file);
   return true;
+}
+
+export function migrateStore(oldPath, newPath) {
+  ensureStore();
+  const oldFile = storePath(oldPath);
+  const newFile = storePath(newPath);
+  if (!existsSync(oldFile)) return { migrated: false, reason: 'no session data at old path' };
+  if (existsSync(newFile)) return { migrated: false, reason: 'session data already exists at new path' };
+  const store = JSON.parse(readFileSync(oldFile, 'utf8'));
+  store.path = newPath;
+  store.name = basename(newPath);
+  atomicWrite(newFile, JSON.stringify(store, null, 2) + '\n');
+  unlinkSync(oldFile);
+  return { migrated: true, sessions: store.sessions.length, pinned: store.pinned?.length ?? 0 };
 }
 
 export function listAllProjects() {

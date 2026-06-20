@@ -4,7 +4,7 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { z } from 'zod';
 import { execSync } from 'child_process';
-import { loadStore, addSession, addPinnedDecision, deleteStore, listAllProjects } from './store.js';
+import { loadStore, addSession, addPinnedDecision, deleteStore, listAllProjects, migrateStore } from './store.js';
 
 import { createRequire } from 'module';
 const { version } = createRequire(import.meta.url)('../package.json');
@@ -40,11 +40,24 @@ server.tool(
     const store = loadStore(resolvedPath);
 
     if (store.sessions.length === 0 && store.pinned.length === 0) {
+      // Check for orphaned session with same project name (directory was likely renamed)
+      const projectName = store.name;
+      const allProjects = listAllProjects();
+      const orphan = allProjects.find(p => p.name === projectName && p.path !== resolvedPath);
+
+      if (orphan) {
+        return {
+          content: [{
+            type: 'text',
+            text: `No session found for ${store.name} at this path, but found session data under the same name at **${orphan.path}** (${orphan.sessions.length} session(s), ${orphan.pinned?.length ?? 0} pinned decision(s)).\n\nThis project was likely renamed or moved. Run \`migrate_project\` with \`old_path: "${orphan.path}"\` and \`new_path: "${resolvedPath}"\` to transfer the history.`,
+          }],
+        };
+      }
+
       // If we fell back to CWD with no session, suggest the most recently active project
       const hint = !project_path ? (() => {
-        const recent = listAllProjects();
-        if (recent.length > 0) {
-          return `\n\nYour most recently active project is **${recent[0].name}** (${recent[0].path}). Call \`load_session\` with \`project_path\` set to that path to restore its context, or call \`list_projects\` to see all tracked projects.`;
+        if (allProjects.length > 0) {
+          return `\n\nYour most recently active project is **${allProjects[0].name}** (${allProjects[0].path}). Call \`load_session\` with \`project_path\` set to that path to restore its context, or call \`list_projects\` to see all tracked projects.`;
         }
         return '';
       })() : '';
@@ -191,6 +204,33 @@ server.tool(
             : `No session data found for ${project_path} — nothing to delete.`,
         },
       ],
+    };
+  }
+);
+
+// ── migrate_project ──────────────────────────────────────────────────────────
+
+server.tool(
+  'migrate_project',
+  'Migrate session data after a project directory is renamed or moved. Transfers all sessions and pinned decisions from the old path to the new path. Use when load_session returns empty for a project you know has history — the directory was likely renamed.',
+  {
+    old_path: z
+      .string()
+      .describe('The previous absolute path to the project root.'),
+    new_path: z
+      .string()
+      .describe('The current absolute path to the project root.'),
+  },
+  async ({ old_path, new_path }) => {
+    const result = migrateStore(old_path, new_path);
+    if (!result.migrated) {
+      return { content: [{ type: 'text', text: `Migration skipped: ${result.reason}.` }] };
+    }
+    return {
+      content: [{
+        type: 'text',
+        text: `Migrated session data from ${old_path} → ${new_path}. Transferred ${result.sessions} session(s) and ${result.pinned} pinned decision(s).`,
+      }],
     };
   }
 );
