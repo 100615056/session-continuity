@@ -3,13 +3,13 @@ import assert from 'node:assert/strict';
 import { mkdtempSync, rmSync, readFileSync, existsSync, mkdirSync, writeFileSync } from 'fs';
 import { join } from 'path';
 import { tmpdir } from 'os';
-import { parseSessions, serializeSessions, PLACEHOLDER } from './utils.js';
+import { parseSessions, serializeSessions, PLACEHOLDER } from './utils.ts';
 
 async function runSnapshotIn(dir) {
   const origCwd = process.cwd();
   process.chdir(dir);
   try {
-    const { snapshot } = await import(`../src/snapshot.js?t=${Date.now()}`);
+    const { snapshot } = await import(`../src/snapshot.ts?t=${Date.now()}`);
     await snapshot();
   } finally {
     process.chdir(origCwd);

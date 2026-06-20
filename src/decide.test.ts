@@ -3,13 +3,13 @@ import assert from 'node:assert/strict';
 import { mkdtempSync, rmSync, readFileSync, writeFileSync, existsSync } from 'fs';
 import { join } from 'path';
 import { tmpdir } from 'os';
-import { PLACEHOLDER, serializeSessions, parseSessions, extractPinnedSection } from './utils.js';
+import { PLACEHOLDER, serializeSessions, parseSessions, extractPinnedSection } from './utils.ts';
 
 async function runDecideIn(dir, message) {
   const origCwd = process.cwd();
   process.chdir(dir);
   try {
-    const { decide } = await import(`../src/decide.js?t=${Date.now()}`);
+    const { decide } = await import(`../src/decide.ts?t=${Date.now()}`);
     const log = console.log;
     console.log = () => {};
     await decide([message]);
@@ -23,7 +23,7 @@ async function runSnapshotIn(dir) {
   const origCwd = process.cwd();
   process.chdir(dir);
   try {
-    const { snapshot } = await import(`../src/snapshot.js?t=${Date.now()}`);
+    const { snapshot } = await import(`../src/snapshot.ts?t=${Date.now()}`);
     await snapshot();
   } finally {
     process.chdir(origCwd);

@@ -1,10 +1,11 @@
 import { existsSync, readFileSync } from 'fs';
-import { SESSION_FILE, PLACEHOLDER, atomicWrite } from './utils.js';
+import { SESSION_FILE, PLACEHOLDER, atomicWrite } from './utils.ts';
 
 const PINNED_HEADER = '## Pinned decisions';
 const PINNED_NOTE = '<!-- sc: pinned decisions survive the rolling session window -->';
 
-export async function decide([message]) {
+export async function decide(args: string[]): Promise<void> {
+  const message = args[0];
   if (!message || !message.trim()) {
     console.error('Usage: sc decide "Your decision or rationale here"');
     process.exit(1);
@@ -19,16 +20,14 @@ export async function decide([message]) {
     ? readFileSync(SESSION_FILE, 'utf8')
     : PLACEHOLDER;
 
-  let updated;
+  let updated: string;
 
   if (existing.includes(PINNED_HEADER)) {
-    // Append bullet under the existing pinned section
     updated = existing.replace(
       /(## Pinned decisions\n(?:<!--[^>]*-->\n)?)([\s\S]*?)(\n---|\n<!-- sc:|$)/,
-      (_, header, body, tail) => `${header}${body}\n${entry}${tail}`
+      (_: string, header: string, body: string, tail: string) => `${header}${body}\n${entry}${tail}`
     );
   } else {
-    // Insert a new pinned section before the first session block (or at top if empty)
     const pinnedBlock = `${PINNED_HEADER}\n${PINNED_NOTE}\n${entry}\n\n`;
     const firstSession = existing.indexOf('---\n');
     if (firstSession === -1 || existing.trim() === PLACEHOLDER.trim()) {

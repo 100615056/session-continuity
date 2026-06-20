@@ -11,7 +11,7 @@ async function runInitIn(dir) {
   try {
     // Re-import fresh each time (clear module cache isn't easy in ESM,
     // so we dynamically import with a cache-busting query param).
-    const { init } = await import(`../src/init.js?t=${Date.now()}`);
+    const { init } = await import(`../src/init.ts?t=${Date.now()}`);
     // Suppress console output during tests
     const log = console.log;
     console.log = () => {};

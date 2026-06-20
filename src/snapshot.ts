@@ -11,7 +11,7 @@ import {
   parseSessions,
   serializeSessions,
   extractPinnedSection,
-} from './utils.js';
+} from './utils.ts';
 import { existsSync, readFileSync } from 'fs';
 
 const NARRATIVE_PROMPT = `You are summarizing a Claude Code development session for the developer who just finished it.
@@ -38,16 +38,23 @@ Rules:
 Git state:
 `;
 
-function collectGitState() {
-  const branch = git('branch --show-current', 'unknown');
-  const status = git('status --short', '(no changes)');
-  const log = git('log --oneline -5', '(no commits)');
-  const diffStat = git('diff --stat HEAD', '').split('\n').slice(0, 10).join('\n');
-
-  return { branch, status, log, diffStat };
+interface GitState {
+  branch: string;
+  status: string;
+  log: string;
+  diffStat: string;
 }
 
-function formatObjectiveEntry(timestamp, gitState) {
+function collectGitState(): GitState {
+  return {
+    branch: git('branch --show-current', 'unknown'),
+    status: git('status --short', '(no changes)'),
+    log: git('log --oneline -5', '(no commits)'),
+    diffStat: git('diff --stat HEAD', '').split('\n').slice(0, 10).join('\n'),
+  };
+}
+
+function formatObjectiveEntry(timestamp: string, gitState: GitState): string {
   const { branch, status, log, diffStat } = gitState;
   return [
     `## Session — ${timestamp} | branch: ${branch}`,
@@ -68,7 +75,7 @@ function formatObjectiveEntry(timestamp, gitState) {
     .trim();
 }
 
-function fetchNarrative(gitState) {
+function fetchNarrative(gitState: GitState): string | null {
   const context = [
     `Branch: ${gitState.branch}`,
     `Status:\n${gitState.status}`,
@@ -90,16 +97,14 @@ function fetchNarrative(gitState) {
   return result.stdout.trim();
 }
 
-export async function snapshot() {
+export async function snapshot(): Promise<void> {
   ensureDir(CLAUDE_DIR);
 
   const timestamp = new Date().toISOString();
   const gitState = collectGitState();
 
-  // Build objective section (always succeeds)
   let entry = formatObjectiveEntry(timestamp, gitState);
 
-  // Attempt narrative via claude -p (15s timeout, silent fallback)
   const narrative = fetchNarrative(gitState);
   if (narrative) {
     const trimmed = trimToWords(narrative, MAX_WORDS_PER_SESSION);
@@ -108,18 +113,15 @@ export async function snapshot() {
     entry += '\n\n**Narrative:** [unavailable — run `claude --version` to enable]';
   }
 
-  // Load existing content, preserving the pinned decisions section
   const rawExisting = existsSync(SESSION_FILE)
     ? readFileSync(SESSION_FILE, 'utf8')
     : '';
   const { pinned, rest } = extractPinnedSection(rawExisting);
   const existingSessions = parseSessions(rest);
 
-  // Prepend new entry, trim rolling window, re-attach pinned block
   const sessions = [entry, ...existingSessions].slice(0, MAX_SESSIONS);
   const serialized = (pinned ? pinned + '\n' : '') + serializeSessions(sessions);
   atomicWrite(SESSION_FILE, serialized);
 
-  // sc snapshot runs as a hook — keep stdout minimal to avoid interfering with Claude
   process.stderr.write(`[sc] snapshot written — ${timestamp}\n`);
 }

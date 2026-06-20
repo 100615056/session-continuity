@@ -8,34 +8,34 @@ export const SETTINGS_FILE = join(CLAUDE_DIR, 'settings.json');
 export const CLAUDE_MD = 'CLAUDE.md';
 export const SESSION_IMPORT_LINE = '@.claude/session.md';
 export const MAX_SESSIONS = 3;
-export const MAX_WORDS_PER_SESSION = 150; // ~200 tokens
+export const MAX_WORDS_PER_SESSION = 150;
 
 export const PLACEHOLDER = `<!-- sc: no previous session recorded -->\n`;
 
-export function ensureDir(dir) {
+export function ensureDir(dir: string): void {
   if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
 }
 
-export function readJson(path, fallback = {}) {
+export function readJson<T = Record<string, unknown>>(path: string, fallback: T = {} as T): T {
   if (!existsSync(path)) return fallback;
   try {
-    return JSON.parse(readFileSync(path, 'utf8'));
+    return JSON.parse(readFileSync(path, 'utf8')) as T;
   } catch {
     return fallback;
   }
 }
 
-export function writeJson(path, obj) {
+export function writeJson(path: string, obj: unknown): void {
   writeFileSync(path, JSON.stringify(obj, null, 2) + '\n', 'utf8');
 }
 
-export function atomicWrite(path, content) {
+export function atomicWrite(path: string, content: string): void {
   const tmp = path + '.tmp';
   writeFileSync(tmp, content, 'utf8');
   renameSync(tmp, path);
 }
 
-export function git(cmd, fallback = '') {
+export function git(cmd: string, fallback = ''): string {
   try {
     return execSync(`git ${cmd}`, {
       encoding: 'utf8',
@@ -46,28 +46,18 @@ export function git(cmd, fallback = '') {
   }
 }
 
-export function trimToWords(text, limit) {
+export function trimToWords(text: string, limit: number): string {
   const words = text.split(/\s+/).filter(Boolean);
   if (words.length <= limit) return text;
   return words.slice(0, limit).join(' ') + ' …[trimmed]';
 }
 
-/**
- * Sessions are stored as blocks separated by a line of three dashes.
- * Returns array of raw session strings (each starts/ends with content, no leading ---).
- */
 const PINNED_HEADER = '## Pinned decisions';
 
-/**
- * Splits content into the pinned decisions block (if any) and the rest.
- * The pinned block is the `## Pinned decisions` section and everything
- * before the first `---` session separator.
- */
-export function extractPinnedSection(content) {
+export function extractPinnedSection(content: string): { pinned: string; rest: string } {
   if (!content.includes(PINNED_HEADER)) return { pinned: '', rest: content };
   const firstSep = content.indexOf('\n---\n');
   if (firstSep === -1) {
-    // Only a pinned section, no session blocks yet
     return { pinned: content.trim(), rest: '' };
   }
   return {
@@ -76,13 +66,13 @@ export function extractPinnedSection(content) {
   };
 }
 
-export function parseSessions(content) {
+export function parseSessions(content: string): string[] {
   return content
     .split(/^---$/m)
     .map((s) => s.trim())
     .filter((s) => s && !s.startsWith('<!--'));
 }
 
-export function serializeSessions(sessions) {
+export function serializeSessions(sessions: string[]): string {
   return sessions.map((s) => `---\n${s}\n`).join('\n') + '\n';
 }

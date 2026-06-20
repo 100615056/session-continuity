@@ -9,16 +9,25 @@ import {
   ensureDir,
   readJson,
   writeJson,
-} from './utils.js';
+} from './utils.ts';
 
-export async function init() {
-  const steps = [];
+interface HookEntry {
+  hooks: Array<{ type: string; command: string }>;
+}
 
-  // 1. Ensure .claude/ exists
+interface Settings {
+  hooks?: {
+    Stop?: HookEntry[];
+    PreCompact?: HookEntry[];
+  };
+}
+
+export async function init(): Promise<void> {
+  const steps: string[] = [];
+
   ensureDir(CLAUDE_DIR);
   steps.push('✓ .claude/ directory ready');
 
-  // 2. Create .claude/session.md if absent
   if (!existsSync(SESSION_FILE)) {
     writeFileSync(SESSION_FILE, PLACEHOLDER, 'utf8');
     steps.push('✓ .claude/session.md created');
@@ -26,7 +35,6 @@ export async function init() {
     steps.push('· .claude/session.md already exists');
   }
 
-  // 3. Upsert @import line into CLAUDE.md
   const claudeMdExists = existsSync(CLAUDE_MD);
   let claudeMdContent = claudeMdExists ? readFileSync(CLAUDE_MD, 'utf8') : '';
 
@@ -39,13 +47,11 @@ export async function init() {
     steps.push('· CLAUDE.md already has @import');
   }
 
-  // 4. Upsert Stop + PreCompact hooks into .claude/settings.json
-  const settings = readJson(SETTINGS_FILE, {});
+  const settings = readJson<Settings>(SETTINGS_FILE, {});
   const hook = { type: 'command', command: 'sc snapshot' };
 
   if (!settings.hooks) settings.hooks = {};
 
-  // Stop hook
   if (!settings.hooks.Stop) settings.hooks.Stop = [];
   const stopWired = settings.hooks.Stop.some(
     (entry) =>
@@ -59,7 +65,6 @@ export async function init() {
     steps.push('· Stop hook already registered');
   }
 
-  // PreCompact hook
   if (!settings.hooks.PreCompact) settings.hooks.PreCompact = [];
   const preCompactWired = settings.hooks.PreCompact.some(
     (entry) =>
@@ -75,7 +80,6 @@ export async function init() {
 
   writeJson(SETTINGS_FILE, settings);
 
-  // 5. Check for claude CLI
   let claudeAvailable = false;
   try {
     const { execSync } = await import('child_process');

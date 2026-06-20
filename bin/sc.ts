@@ -1,23 +1,23 @@
 #!/usr/bin/env node
 
-import { init } from '../src/init.js';
-import { snapshot } from '../src/snapshot.js';
-import { status } from '../src/status.js';
-import { clear } from '../src/clear.js';
-import { rotate } from '../src/rotate.js';
-import { decide } from '../src/decide.js';
-import { runDoctor } from '../mcp/store.js';
+import { init } from '../src/init.ts';
+import { snapshot } from '../src/snapshot.ts';
+import { status } from '../src/status.ts';
+import { clear } from '../src/clear.ts';
+import { rotate } from '../src/rotate.ts';
+import { decide } from '../src/decide.ts';
+import { runDoctor, type DoctorCheck } from '../mcp/store.ts';
 
 const [, , cmd, ...args] = process.argv;
 
-function doctor() {
+function doctor(): void {
   const checks = runDoctor();
-  const allOk = checks.every(c => c.ok);
+  const allOk = checks.every((c: DoctorCheck) => c.ok);
   console.log(allOk ? '✅ All checks passed\n' : '⚠️  Issues found\n');
   for (const c of checks) {
     console.log(`${c.ok ? '✅' : '❌'} ${c.name}: ${c.detail}`);
   }
-  const orphanCheck = checks.find(c => c.name === 'Orphaned sessions' && !c.ok);
+  const orphanCheck = checks.find((c: DoctorCheck) => c.name === 'Orphaned sessions' && !c.ok);
   if (orphanCheck?.orphaned) {
     console.log('\nTo fix orphaned sessions, run:');
     for (const o of orphanCheck.orphaned) {
@@ -27,7 +27,9 @@ function doctor() {
   if (!allOk) process.exit(1);
 }
 
-const commands = { init, snapshot, status, clear, rotate, decide, doctor };
+const commands: Record<string, (args: string[]) => Promise<void> | void> = {
+  init, snapshot, status, clear, rotate, decide, doctor,
+};
 
 if (!cmd || cmd === '--help' || cmd === '-h') {
   console.log(`
@@ -52,7 +54,7 @@ Options:
 if (cmd === '--version' || cmd === '-v') {
   const { createRequire } = await import('module');
   const require = createRequire(import.meta.url);
-  const pkg = require('../package.json');
+  const pkg = require('../package.json') as { version: string };
   console.log(pkg.version);
   process.exit(0);
 }
@@ -65,6 +67,6 @@ if (!commands[cmd]) {
 try {
   await commands[cmd](args);
 } catch (err) {
-  console.error(`sc ${cmd} failed:`, err.message);
+  console.error(`sc ${cmd} failed:`, (err as Error).message);
   process.exit(1);
 }

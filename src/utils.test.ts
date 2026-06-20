@@ -9,7 +9,7 @@ import {
   parseSessions,
   serializeSessions,
   atomicWrite,
-} from './utils.js';
+} from './utils.ts';
 
 // ── trimToWords ──────────────────────────────────────────────────────────────
 

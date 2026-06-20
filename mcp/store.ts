@@ -1,53 +1,76 @@
-/**
- * Central session storage — ~/.sc/sessions/<hash>.json per project.
- * Each file holds: { path, name, pinned: [], sessions: [] }
- */
-
-import { existsSync, readFileSync, readdirSync, mkdirSync, unlinkSync, renameSync, accessSync, constants } from 'fs';
+import { existsSync, readFileSync, readdirSync, mkdirSync, unlinkSync, accessSync, constants } from 'fs';
 import { join, basename } from 'path';
 import { homedir } from 'os';
 import { createHash } from 'crypto';
-import { atomicWrite, MAX_SESSIONS } from '../src/utils.js';
+import { atomicWrite, MAX_SESSIONS } from '../src/utils.ts';
+
+export interface PinnedDecision {
+  text: string;
+  timestamp: string;
+}
+
+export interface SessionEntry {
+  timestamp: string;
+  branch: string;
+  status: string;
+  decisions: string[];
+  next_steps: string[];
+  blockers: string;
+}
+
+export interface ProjectStore {
+  path: string;
+  name: string;
+  pinned: PinnedDecision[];
+  sessions: SessionEntry[];
+}
+
+export interface DoctorCheck {
+  name: string;
+  ok: boolean;
+  detail: string;
+  orphaned?: Array<{ name: string; path: string }>;
+}
 
 export const SC_DIR = join(homedir(), '.sc', 'sessions');
 
-export function ensureStore() {
+export function ensureStore(): void {
   if (!existsSync(SC_DIR)) mkdirSync(SC_DIR, { recursive: true });
 }
 
-function projectKey(projectPath) {
+function projectKey(projectPath: string): string {
   return createHash('sha1').update(projectPath).digest('hex').slice(0, 12);
 }
 
-function storePath(projectPath) {
+function storePath(projectPath: string): string {
   return join(SC_DIR, `${projectKey(projectPath)}.json`);
 }
 
-export function loadStore(projectPath) {
+export function loadStore(projectPath: string): ProjectStore {
   const file = storePath(projectPath);
   if (!existsSync(file)) {
     return { path: projectPath, name: basename(projectPath), pinned: [], sessions: [] };
   }
   try {
-    return JSON.parse(readFileSync(file, 'utf8'));
+    return JSON.parse(readFileSync(file, 'utf8')) as ProjectStore;
   } catch {
     return { path: projectPath, name: basename(projectPath), pinned: [], sessions: [] };
   }
 }
 
-export function saveStore(projectPath, store) {
+export function saveStore(projectPath: string, store: ProjectStore): void {
   ensureStore();
   atomicWrite(storePath(projectPath), JSON.stringify(store, null, 2) + '\n');
 }
 
-export function addSession(projectPath, entry) {
+export function addSession(projectPath: string, entry: SessionEntry): ProjectStore {
   const store = loadStore(projectPath);
   store.sessions = [entry, ...store.sessions].slice(0, MAX_SESSIONS);
   saveStore(projectPath, store);
   return store;
 }
 
-export function addPinnedDecision(projectPath, text) {
+export function addPinnedDecision(projectPath: string, text: string): ProjectStore {
   const store = loadStore(projectPath);
   store.pinned = store.pinned || [];
   store.pinned.push({ text, timestamp: new Date().toISOString() });
@@ -55,20 +78,20 @@ export function addPinnedDecision(projectPath, text) {
   return store;
 }
 
-export function deleteStore(projectPath) {
+export function deleteStore(projectPath: string): boolean {
   const file = storePath(projectPath);
   if (!existsSync(file)) return false;
   unlinkSync(file);
   return true;
 }
 
-export function migrateStore(oldPath, newPath) {
+export function migrateStore(oldPath: string, newPath: string): { migrated: boolean; reason?: string; sessions?: number; pinned?: number } {
   ensureStore();
   const oldFile = storePath(oldPath);
   const newFile = storePath(newPath);
   if (!existsSync(oldFile)) return { migrated: false, reason: 'no session data at old path' };
   if (existsSync(newFile)) return { migrated: false, reason: 'session data already exists at new path' };
-  const store = JSON.parse(readFileSync(oldFile, 'utf8'));
+  const store = JSON.parse(readFileSync(oldFile, 'utf8')) as ProjectStore;
   store.path = newPath;
   store.name = basename(newPath);
   atomicWrite(newFile, JSON.stringify(store, null, 2) + '\n');
@@ -76,10 +99,9 @@ export function migrateStore(oldPath, newPath) {
   return { migrated: true, sessions: store.sessions.length, pinned: store.pinned?.length ?? 0 };
 }
 
-export function runDoctor() {
-  const checks = [];
+export function runDoctor(): DoctorCheck[] {
+  const checks: DoctorCheck[] = [];
 
-  // 1. Sessions directory
   try {
     ensureStore();
     accessSync(SC_DIR, constants.W_OK);
@@ -88,8 +110,7 @@ export function runDoctor() {
     checks.push({ name: 'Sessions directory', ok: false, detail: `Not writable: ${SC_DIR}` });
   }
 
-  // 2. Session files
-  let files = [];
+  let files: string[] = [];
   try {
     files = readdirSync(SC_DIR).filter(f => f.endsWith('.json'));
     checks.push({ name: 'Session files', ok: true, detail: `${files.length} project(s) tracked` });
@@ -97,13 +118,12 @@ export function runDoctor() {
     checks.push({ name: 'Session files', ok: false, detail: 'Cannot read sessions directory' });
   }
 
-  // 3. Parse all files, find orphans and corruption
-  const orphaned = [];
-  const corrupt = [];
-  let latestTimestamp = null;
+  const orphaned: Array<{ name: string; path: string }> = [];
+  const corrupt: string[] = [];
+  let latestTimestamp: string | null = null;
   for (const f of files) {
     try {
-      const store = JSON.parse(readFileSync(join(SC_DIR, f), 'utf8'));
+      const store = JSON.parse(readFileSync(join(SC_DIR, f), 'utf8')) as ProjectStore;
       if (store.path && !existsSync(store.path)) {
         orphaned.push({ name: store.name, path: store.path });
       }
@@ -126,7 +146,6 @@ export function runDoctor() {
     checks.push({ name: 'Orphaned sessions', ok: true, detail: 'All tracked projects exist on disk' });
   }
 
-  // 4. Last activity
   if (latestTimestamp) {
     const daysAgo = Math.floor((Date.now() - new Date(latestTimestamp).getTime()) / 86400000);
     checks.push({ name: 'Last activity', ok: daysAgo < 30, detail: daysAgo === 0 ? 'Today' : `${daysAgo} day(s) ago` });
@@ -137,18 +156,18 @@ export function runDoctor() {
   return checks;
 }
 
-export function listAllProjects() {
+export function listAllProjects(): ProjectStore[] {
   ensureStore();
   return readdirSync(SC_DIR)
     .filter((f) => f.endsWith('.json'))
     .map((f) => {
       try {
-        return JSON.parse(readFileSync(join(SC_DIR, f), 'utf8'));
+        return JSON.parse(readFileSync(join(SC_DIR, f), 'utf8')) as ProjectStore;
       } catch {
         return null;
       }
     })
-    .filter(Boolean)
+    .filter((s): s is ProjectStore => s !== null)
     .sort((a, b) => {
       const aDate = a.sessions[0]?.timestamp ?? '';
       const bDate = b.sessions[0]?.timestamp ?? '';

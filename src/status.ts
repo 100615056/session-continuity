@@ -1,7 +1,7 @@
 import { existsSync, readFileSync } from 'fs';
-import { SESSION_FILE } from './utils.js';
+import { SESSION_FILE } from './utils.ts';
 
-export async function status() {
+export async function status(): Promise<void> {
   if (!existsSync(SESSION_FILE)) {
     console.log('No session file found. Run `sc init` first.');
     return;

@@ -4,17 +4,17 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { z } from 'zod';
 import { execSync } from 'child_process';
-import { loadStore, addSession, addPinnedDecision, deleteStore, listAllProjects, migrateStore, runDoctor } from './store.js';
+import { loadStore, addSession, addPinnedDecision, deleteStore, listAllProjects, migrateStore, runDoctor, type DoctorCheck } from './store.ts';
 
 import { createRequire } from 'module';
-const { version } = createRequire(import.meta.url)('../package.json');
+const { version } = createRequire(import.meta.url)('../package.json') as { version: string };
 
 const server = new McpServer({
   name: 'session-continuity',
   version,
 });
 
-function detectBranch(projectPath) {
+function detectBranch(projectPath: string): string {
   try {
     return execSync('git rev-parse --abbrev-ref HEAD', { cwd: projectPath, stdio: ['ignore', 'pipe', 'ignore'] })
       .toString()
@@ -40,7 +40,6 @@ server.tool(
     const store = loadStore(resolvedPath);
 
     if (store.sessions.length === 0 && store.pinned.length === 0) {
-      // Check for orphaned session with same project name (directory was likely renamed)
       const projectName = store.name;
       const allProjects = listAllProjects();
       const orphan = allProjects.find(p => p.name === projectName && p.path !== resolvedPath);
@@ -48,13 +47,12 @@ server.tool(
       if (orphan) {
         return {
           content: [{
-            type: 'text',
+            type: 'text' as const,
             text: `No session found for ${store.name} at this path, but found session data under the same name at **${orphan.path}** (${orphan.sessions.length} session(s), ${orphan.pinned?.length ?? 0} pinned decision(s)).\n\nThis project was likely renamed or moved. Run \`migrate_project\` with \`old_path: "${orphan.path}"\` and \`new_path: "${resolvedPath}"\` to transfer the history.`,
           }],
         };
       }
 
-      // If we fell back to CWD with no session, suggest the most recently active project
       const hint = !project_path ? (() => {
         if (allProjects.length > 0) {
           return `\n\nYour most recently active project is **${allProjects[0].name}** (${allProjects[0].path}). Call \`load_session\` with \`project_path\` set to that path to restore its context, or call \`list_projects\` to see all tracked projects.`;
@@ -63,12 +61,7 @@ server.tool(
       })() : '';
 
       return {
-        content: [
-          {
-            type: 'text',
-            text: `No previous session found for ${store.name}. This appears to be a fresh start.${hint}`,
-          },
-        ],
+        content: [{ type: 'text' as const, text: `No previous session found for ${store.name}. This appears to be a fresh start.${hint}` }],
       };
     }
 
@@ -100,7 +93,7 @@ server.tool(
       lines.push('');
     });
 
-    return { content: [{ type: 'text', text: lines.join('\n') }] };
+    return { content: [{ type: 'text' as const, text: lines.join('\n') }] };
   }
 );
 
@@ -110,30 +103,12 @@ server.tool(
   'save_session',
   'Save the current session context for a project. Call this at the end of a session or at any checkpoint. Writes to ~/.sc/sessions/ — does not modify your repo. Pinned decisions (set via pin_decision mid-session) are permanent and survive session pruning; the sessions saved here are kept for a rolling window of recent history. Example: save_session({ status: "Sign-in page built, sign-up halfway done", decisions: ["Chose email-only auth — social login out of scope"], next_steps: ["Finish sign-up form", "Add validation", "Wire to Supabase"], blockers: "None", branch: "feature/auth" })',
   {
-    project_path: z
-      .string()
-      .describe('Absolute path to the project root. Defaults to current working directory.')
-      .optional(),
-    status: z
-      .string()
-      .min(1, 'status cannot be empty')
-      .describe('One sentence: what was being worked on and where things stand. Required.'),
-    decisions: z
-      .array(z.string())
-      .describe('Key decisions made this session, each with the reason why. (optional)')
-      .optional(),
-    next_steps: z
-      .array(z.string())
-      .describe('Ordered list of what to do next session, most important first. (optional)')
-      .optional(),
-    blockers: z
-      .string()
-      .describe('Current blockers, or "None". (optional)')
-      .optional(),
-    branch: z
-      .string()
-      .describe('Current git branch. (optional — auto-detected from git if omitted)')
-      .optional(),
+    project_path: z.string().describe('Absolute path to the project root. Defaults to current working directory.').optional(),
+    status: z.string().min(1, 'status cannot be empty').describe('One sentence: what was being worked on and where things stand. Required.'),
+    decisions: z.array(z.string()).describe('Key decisions made this session, each with the reason why. (optional)').optional(),
+    next_steps: z.array(z.string()).describe('Ordered list of what to do next session, most important first. (optional)').optional(),
+    blockers: z.string().describe('Current blockers, or "None". (optional)').optional(),
+    branch: z.string().describe('Current git branch. (optional — auto-detected from git if omitted)').optional(),
   },
   async ({ project_path, status, decisions, next_steps, blockers, branch }) => {
     const resolvedPath = project_path || process.cwd();
@@ -160,7 +135,7 @@ server.tool(
       `\nNext session will start with: "${status}"`,
     ].filter(Boolean).join('\n');
 
-    return { content: [{ type: 'text', text: summary }] };
+    return { content: [{ type: 'text' as const, text: summary }] };
   }
 );
 
@@ -170,19 +145,14 @@ server.tool(
   'pin_decision',
   'Pin a mid-session decision so it persists even if save_session is never called. Use this the moment a meaningful architectural or product choice is made — do not wait until the end of the session. Unlike save_session (which keeps a rolling window of recent history), pinned decisions persist indefinitely and are never pruned. Writes to ~/.sc/sessions/ — does not modify your repo.',
   {
-    project_path: z
-      .string()
-      .describe('Absolute path to the project root. Defaults to current working directory.')
-      .optional(),
-    decision: z
-      .string()
-      .describe('The decision to record. Include the "why" — e.g. "Chose X over Y because Z."'),
+    project_path: z.string().describe('Absolute path to the project root. Defaults to current working directory.').optional(),
+    decision: z.string().describe('The decision to record. Include the "why" — e.g. "Chose X over Y because Z."'),
   },
   async ({ project_path, decision }) => {
     const resolvedPath = project_path || process.cwd();
     addPinnedDecision(resolvedPath, decision);
     return {
-      content: [{ type: 'text', text: `Pinned: "${decision}" — persists even if save_session isn't called this session.` }],
+      content: [{ type: 'text' as const, text: `Pinned: "${decision}" — persists even if save_session isn't called this session.` }],
     };
   }
 );
@@ -193,21 +163,17 @@ server.tool(
   'delete_session_permanently',
   'Permanently delete all stored session history and pinned decisions for a project. NOT RECOVERABLE — there is no undo. Use only when you want to fully clear Claude\'s memory of a project. To update what Claude knows instead, use save_session. Only removes data from ~/.sc/sessions/ — does not modify your repo.',
   {
-    project_path: z
-      .string()
-      .describe('Absolute path to the project root whose session data should be deleted. Required — no CWD default, to prevent accidental deletion.'),
+    project_path: z.string().describe('Absolute path to the project root whose session data should be deleted. Required — no CWD default, to prevent accidental deletion.'),
   },
   async ({ project_path }) => {
     const deleted = deleteStore(project_path);
     return {
-      content: [
-        {
-          type: 'text',
-          text: deleted
-            ? `Session data deleted for ${project_path}. All sessions and pinned decisions removed.`
-            : `No session data found for ${project_path} — nothing to delete.`,
-        },
-      ],
+      content: [{
+        type: 'text' as const,
+        text: deleted
+          ? `Session data deleted for ${project_path}. All sessions and pinned decisions removed.`
+          : `No session data found for ${project_path} — nothing to delete.`,
+      }],
     };
   }
 );
@@ -218,21 +184,17 @@ server.tool(
   'migrate_project',
   'Migrate session data after a project directory is renamed or moved. Transfers all sessions and pinned decisions from the old path to the new path. Use when load_session returns empty for a project you know has history — the directory was likely renamed.',
   {
-    old_path: z
-      .string()
-      .describe('The previous absolute path to the project root.'),
-    new_path: z
-      .string()
-      .describe('The current absolute path to the project root.'),
+    old_path: z.string().describe('The previous absolute path to the project root.'),
+    new_path: z.string().describe('The current absolute path to the project root.'),
   },
   async ({ old_path, new_path }) => {
     const result = migrateStore(old_path, new_path);
     if (!result.migrated) {
-      return { content: [{ type: 'text', text: `Migration skipped: ${result.reason}.` }] };
+      return { content: [{ type: 'text' as const, text: `Migration skipped: ${result.reason}.` }] };
     }
     return {
       content: [{
-        type: 'text',
+        type: 'text' as const,
         text: `Migrated session data from ${old_path} → ${new_path}. Transferred ${result.sessions} session(s) and ${result.pinned} pinned decision(s).`,
       }],
     };
@@ -249,9 +211,7 @@ server.tool(
     const projects = listAllProjects();
 
     if (projects.length === 0) {
-      return {
-        content: [{ type: 'text', text: 'No projects tracked yet. Save a session first.' }],
-      };
+      return { content: [{ type: 'text' as const, text: 'No projects tracked yet. Save a session first.' }] };
     }
 
     const lines = ['# Tracked projects\n'];
@@ -269,7 +229,7 @@ server.tool(
       lines.push('');
     });
 
-    return { content: [{ type: 'text', text: lines.join('\n') }] };
+    return { content: [{ type: 'text' as const, text: lines.join('\n') }] };
   }
 );
 
@@ -281,14 +241,14 @@ server.tool(
   {},
   async () => {
     const checks = runDoctor();
-    const allOk = checks.every(c => c.ok);
+    const allOk = checks.every((c: DoctorCheck) => c.ok);
     const lines = [
       allOk ? '✅ All checks passed' : '⚠️ Issues found',
       '',
-      ...checks.map(c => `${c.ok ? '✅' : '❌'} **${c.name}:** ${c.detail}`),
+      ...checks.map((c: DoctorCheck) => `${c.ok ? '✅' : '❌'} **${c.name}:** ${c.detail}`),
     ];
 
-    const orphanCheck = checks.find(c => c.name === 'Orphaned sessions' && !c.ok);
+    const orphanCheck = checks.find((c: DoctorCheck) => c.name === 'Orphaned sessions' && !c.ok);
     if (orphanCheck?.orphaned) {
       lines.push('', '**To fix orphaned sessions**, run `migrate_project` with the old and new paths:');
       for (const o of orphanCheck.orphaned) {
@@ -296,7 +256,7 @@ server.tool(
       }
     }
 
-    return { content: [{ type: 'text', text: lines.join('\n') }] };
+    return { content: [{ type: 'text' as const, text: lines.join('\n') }] };
   }
 );
 

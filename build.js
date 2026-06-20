@@ -12,14 +12,14 @@ const shared = {
 
 await build({
   ...shared,
-  entryPoints: ['bin/sc'],
+  entryPoints: ['bin/sc.ts'],
   outfile: 'dist/cli.js',
   banner: { js: '#!/usr/bin/env node' },
 });
 
 await build({
   ...shared,
-  entryPoints: ['mcp/server.js'],
+  entryPoints: ['mcp/server.ts'],
   outfile: 'dist/server.js',
   banner: { js: '#!/usr/bin/env node' },
 });

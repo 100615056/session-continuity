@@ -18,7 +18,7 @@
   "scripts": {
     "build": "node build.js",
     "prepare": "node build.js",
-    "test": "node --test src/*.test.js"
+    "test": "node --experimental-strip-types --test 'src/*.test.ts'"
   },
   "engines": {
     "node": ">=18"
@@ -42,6 +42,8 @@
     "zod": "^4.4.3"
   },
   "devDependencies": {
-    "esbuild": "^0.28.0"
+    "@types/node": "^26.0.0",
+    "esbuild": "^0.28.0",
+    "typescript": "^6.0.3"
   }
 }
