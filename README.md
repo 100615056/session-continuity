@@ -12,6 +12,64 @@ Open a project in Claude Code and start working. That's it.
 
 ---
 
+## Other editors
+
+<details>
+<summary><strong>Cursor</strong></summary>
+
+Add to `.cursor/mcp.json` in your project root (or `~/.cursor/mcp.json` globally):
+
+```json
+{
+  "mcpServers": {
+    "session-continuity": {
+      "command": "npx",
+      "args": ["session-continuity"]
+    }
+  }
+}
+```
+
+</details>
+
+<details>
+<summary><strong>VS Code (Copilot)</strong></summary>
+
+Add to `.vscode/mcp.json` in your project root:
+
+```json
+{
+  "servers": {
+    "session-continuity": {
+      "command": "npx",
+      "args": ["session-continuity"]
+    }
+  }
+}
+```
+
+</details>
+
+<details>
+<summary><strong>Windsurf</strong></summary>
+
+Add to `~/.codeium/windsurf/mcp_config.json`:
+
+```json
+{
+  "mcpServers": {
+    "session-continuity": {
+      "command": "npx",
+      "args": ["session-continuity"]
+    }
+  }
+}
+```
+
+</details>
+
+---
+
 ## How it works
 
 Claude calls five MCP tools — you do nothing.
