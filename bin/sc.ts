@@ -6,6 +6,8 @@ import { status } from '../src/status.ts';
 import { clear } from '../src/clear.ts';
 import { rotate } from '../src/rotate.ts';
 import { decide } from '../src/decide.ts';
+import { edit } from '../src/edit.ts';
+import { undo } from '../src/undo.ts';
 import { runDoctor, type DoctorCheck } from '../mcp/store.ts';
 
 const [, , cmd, ...args] = process.argv;
@@ -28,7 +30,7 @@ function doctor(): void {
 }
 
 const commands: Record<string, (args: string[]) => Promise<void> | void> = {
-  init, snapshot, status, clear, rotate, decide, doctor,
+  init, snapshot, status, clear, rotate, decide, edit, undo, doctor,
 };
 
 if (!cmd || cmd === '--help' || cmd === '-h') {
@@ -42,6 +44,8 @@ Commands:
   sc clear             Reset session history
   sc rotate            Manually trigger a snapshot write (use before force-quit)
   sc decide "<why>"    Pin a permanent decision that survives the rolling window
+  sc edit [path]       Open the most recent session entry in $EDITOR
+  sc undo [path]       Remove the most recent session entry
   sc doctor            Check setup health: directory, data integrity, orphaned sessions
 
 Options:

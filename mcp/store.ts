@@ -156,6 +156,22 @@ export function runDoctor(): DoctorCheck[] {
   return checks;
 }
 
+export function editLatestSession(projectPath: string, updates: Partial<SessionEntry>): { updated: boolean; session?: SessionEntry } {
+  const store = loadStore(projectPath);
+  if (store.sessions.length === 0) return { updated: false };
+  Object.assign(store.sessions[0], updates);
+  saveStore(projectPath, store);
+  return { updated: true, session: store.sessions[0] };
+}
+
+export function removeLatestSession(projectPath: string): { removed: boolean; session?: SessionEntry } {
+  const store = loadStore(projectPath);
+  if (store.sessions.length === 0) return { removed: false };
+  const session = store.sessions.shift()!;
+  saveStore(projectPath, store);
+  return { removed: true, session };
+}
+
 export function listAllProjects(): ProjectStore[] {
   ensureStore();
   return readdirSync(SC_DIR)

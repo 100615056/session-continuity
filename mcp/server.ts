@@ -4,7 +4,7 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { z } from 'zod';
 import { execSync } from 'child_process';
-import { loadStore, addSession, addPinnedDecision, deleteStore, listAllProjects, migrateStore, runDoctor, type DoctorCheck } from './store.ts';
+import { loadStore, addSession, addPinnedDecision, deleteStore, listAllProjects, migrateStore, editLatestSession, removeLatestSession, runDoctor, type DoctorCheck } from './store.ts';
 
 import { createRequire } from 'module';
 const { version } = createRequire(import.meta.url)('../package.json') as { version: string };
@@ -257,6 +257,66 @@ server.tool(
     }
 
     return { content: [{ type: 'text' as const, text: lines.join('\n') }] };
+  }
+);
+
+// ── edit_session ─────────────────────────────────────────────────────────────
+
+server.tool(
+  'edit_session',
+  'Merge updates into the most recent session entry for a project. Use this to correct or refine the last saved session without replacing it entirely. Only the fields you provide are updated — omitted fields are left unchanged.',
+  {
+    project_path: z.string().describe('Absolute path to the project root. Defaults to current working directory.').optional(),
+    updates: z.object({
+      status: z.string().optional(),
+      decisions: z.array(z.string()).optional(),
+      next_steps: z.array(z.string()).optional(),
+      blockers: z.string().optional(),
+      branch: z.string().optional(),
+    }).describe('Fields to update in the most recent session entry. Only provided fields are changed.'),
+  },
+  async ({ project_path, updates }) => {
+    const resolvedPath = project_path || process.cwd();
+    const result = editLatestSession(resolvedPath, updates);
+
+    if (!result.updated) {
+      return { content: [{ type: 'text' as const, text: `No sessions found for ${resolvedPath} — nothing to edit.` }] };
+    }
+
+    const s = result.session!;
+    const fields = Object.keys(updates).join(', ');
+    return {
+      content: [{
+        type: 'text' as const,
+        text: `Updated session (${s.timestamp}): changed ${fields}.\nStatus: "${s.status}"`,
+      }],
+    };
+  }
+);
+
+// ── undo_session ─────────────────────────────────────────────────────────────
+
+server.tool(
+  'undo_session',
+  'Remove the most recent session entry for a project. Pinned decisions are not affected. Use when the last save_session captured incorrect or unwanted state.',
+  {
+    project_path: z.string().describe('Absolute path to the project root. Defaults to current working directory.').optional(),
+  },
+  async ({ project_path }) => {
+    const resolvedPath = project_path || process.cwd();
+    const result = removeLatestSession(resolvedPath);
+
+    if (!result.removed) {
+      return { content: [{ type: 'text' as const, text: `No sessions found for ${resolvedPath} — nothing to undo.` }] };
+    }
+
+    const s = result.session!;
+    return {
+      content: [{
+        type: 'text' as const,
+        text: `Removed session from ${s.timestamp}: "${s.status}"`,
+      }],
+    };
   }
 );
 

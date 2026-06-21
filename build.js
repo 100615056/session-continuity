@@ -21,7 +21,6 @@ await build({
   ...shared,
   entryPoints: ['mcp/server.ts'],
   outfile: 'dist/server.js',
-  banner: { js: '#!/usr/bin/env node' },
 });
 
 console.log('Build complete → dist/');
