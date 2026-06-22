@@ -18,3 +18,6 @@ reports/
 .env.*
 *.key
 *.pem
+
+# MCP config artifacts
+server.json
