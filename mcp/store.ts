@@ -1,9 +1,11 @@
-import { existsSync, readFileSync, readdirSync, mkdirSync, unlinkSync, accessSync, constants } from 'fs';
-import { join, basename } from 'path';
+import { existsSync, readFileSync, readdirSync, mkdirSync, unlinkSync, accessSync, realpathSync, constants } from 'fs';
+import { join, basename, resolve } from 'path';
 import { homedir } from 'os';
 import { createHash } from 'crypto';
 import { atomicWrite, MAX_SESSIONS } from '../src/utils.ts';
 
+// Legacy: pin_decision was retired in 0.4.0. Existing entries are kept on disk
+// but no longer replayed by load_session.
 export interface PinnedDecision {
   text: string;
   timestamp: string;
@@ -38,15 +40,26 @@ export function ensureStore(): void {
   if (!existsSync(SC_DIR)) mkdirSync(SC_DIR, { recursive: true });
 }
 
+// Same directory → same key, regardless of relative paths, trailing slashes or symlinks.
+export function canonicalPath(projectPath: string): string {
+  const abs = resolve(projectPath);
+  try {
+    return realpathSync(abs);
+  } catch {
+    return abs;
+  }
+}
+
 function projectKey(projectPath: string): string {
-  return createHash('sha1').update(projectPath).digest('hex').slice(0, 12);
+  return createHash('sha1').update(canonicalPath(projectPath)).digest('hex').slice(0, 12);
 }
 
 function storePath(projectPath: string): string {
   return join(SC_DIR, `${projectKey(projectPath)}.json`);
 }
 
-export function loadStore(projectPath: string): ProjectStore {
+export function loadStore(rawPath: string): ProjectStore {
+  const projectPath = canonicalPath(rawPath);
   const file = storePath(projectPath);
   if (!existsSync(file)) {
     return { path: projectPath, name: basename(projectPath), pinned: [], sessions: [] };
@@ -70,14 +83,6 @@ export function addSession(projectPath: string, entry: SessionEntry): ProjectSto
   return store;
 }
 
-export function addPinnedDecision(projectPath: string, text: string): ProjectStore {
-  const store = loadStore(projectPath);
-  store.pinned = store.pinned || [];
-  store.pinned.push({ text, timestamp: new Date().toISOString() });
-  saveStore(projectPath, store);
-  return store;
-}
-
 export function deleteStore(projectPath: string): boolean {
   const file = storePath(projectPath);
   if (!existsSync(file)) return false;
@@ -92,8 +97,8 @@ export function migrateStore(oldPath: string, newPath: string): { migrated: bool
   if (!existsSync(oldFile)) return { migrated: false, reason: 'no session data at old path' };
   if (existsSync(newFile)) return { migrated: false, reason: 'session data already exists at new path' };
   const store = JSON.parse(readFileSync(oldFile, 'utf8')) as ProjectStore;
-  store.path = newPath;
-  store.name = basename(newPath);
+  store.path = canonicalPath(newPath);
+  store.name = basename(store.path);
   atomicWrite(newFile, JSON.stringify(store, null, 2) + '\n');
   unlinkSync(oldFile);
   return { migrated: true, sessions: store.sessions.length, pinned: store.pinned?.length ?? 0 };

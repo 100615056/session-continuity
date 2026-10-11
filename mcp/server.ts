@@ -4,7 +4,7 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { z } from 'zod';
 import { execSync } from 'child_process';
-import { loadStore, addSession, addPinnedDecision, deleteStore, listAllProjects, migrateStore, editLatestSession, removeLatestSession, runDoctor, type DoctorCheck } from './store.ts';
+import { loadStore, addSession, deleteStore, listAllProjects, migrateStore, editLatestSession, removeLatestSession, runDoctor, type DoctorCheck } from './store.ts';
 
 import { createRequire } from 'module';
 const { version } = createRequire(import.meta.url)('../package.json') as { version: string };
@@ -32,14 +32,15 @@ server.tool(
   {
     project_path: z
       .string()
-      .describe('Absolute path to the project root. Defaults to current working directory. Omit if you are already in the project directory.')
+      .describe('Absolute path to the specific project\'s root (not a parent folder holding several projects). Defaults to current working directory.')
       .optional(),
   },
   async ({ project_path }) => {
-    const resolvedPath = project_path || process.cwd();
-    const store = loadStore(resolvedPath);
+    const store = loadStore(project_path || process.cwd());
+    const resolvedPath = store.path;
+    const legacyPinned = store.pinned?.length ?? 0;
 
-    if (store.sessions.length === 0 && store.pinned.length === 0) {
+    if (store.sessions.length === 0) {
       const projectName = store.name;
       const allProjects = listAllProjects();
       const orphan = allProjects.find(p => p.name === projectName && p.path !== resolvedPath);
@@ -48,7 +49,7 @@ server.tool(
         return {
           content: [{
             type: 'text' as const,
-            text: `No session found for ${store.name} at this path, but found session data under the same name at **${orphan.path}** (${orphan.sessions.length} session(s), ${orphan.pinned?.length ?? 0} pinned decision(s)).\n\nThis project was likely renamed or moved. Run \`migrate_project\` with \`old_path: "${orphan.path}"\` and \`new_path: "${resolvedPath}"\` to transfer the history.`,
+            text: `No session found for ${store.name} at this path, but found session data under the same name at **${orphan.path}** (${orphan.sessions.length} session(s)).\n\nThis project was likely renamed or moved. Run \`migrate_project\` with \`old_path: "${orphan.path}"\` and \`new_path: "${resolvedPath}"\` to transfer the history.`,
           }],
         };
       }
@@ -67,31 +68,29 @@ server.tool(
 
     const lines = [`# Session context — ${store.name}`, `**Project:** ${store.path}`, ''];
 
-    if (store.pinned.length > 0) {
-      lines.push('## Pinned decisions');
-      store.pinned.forEach((d) => lines.push(`- ${d.text} _(${d.timestamp})_`));
-      lines.push('');
+    const [last, ...earlier] = store.sessions;
+    lines.push(`## Last session — ${last.timestamp}`);
+    lines.push(`**Branch:** ${last.branch}`);
+    lines.push(`**Status:** ${last.status}`);
+    if (last.decisions?.length) {
+      lines.push('**Decisions made:**');
+      last.decisions.forEach((d) => lines.push(`- ${d}`));
+    }
+    if (last.next_steps?.length) {
+      lines.push('**Next steps:**');
+      last.next_steps.forEach((n) => lines.push(`- ${n}`));
+    }
+    if (last.blockers) lines.push(`**Blockers:** ${last.blockers}`);
+
+    // Older sessions are only orientation — one line each keeps load cheap.
+    if (earlier.length > 0) {
+      lines.push('', '## Earlier');
+      earlier.forEach((s) => lines.push(`- ${s.timestamp.slice(0, 10)}: ${s.status}`));
     }
 
-    if (store.pinned.length > 0 && store.sessions.length > 0) {
-      lines.push('---', '');
+    if (legacyPinned > 0) {
+      lines.push('', `_${legacyPinned} legacy pinned decision(s) are stored but not shown. Durable decisions belong in Claude's memory, not here._`);
     }
-
-    store.sessions.forEach((s, i) => {
-      lines.push(`## ${i === 0 ? 'Last session' : `Session ${i + 1} ago`} — ${s.timestamp}`);
-      lines.push(`**Branch:** ${s.branch}`);
-      lines.push(`**Status:** ${s.status}`);
-      if (s.decisions?.length) {
-        lines.push('**Decisions made:**');
-        s.decisions.forEach((d) => lines.push(`- ${d}`));
-      }
-      if (s.next_steps?.length) {
-        lines.push('**Next steps:**');
-        s.next_steps.forEach((n) => lines.push(`- ${n}`));
-      }
-      if (s.blockers) lines.push(`**Blockers:** ${s.blockers}`);
-      lines.push('');
-    });
 
     return { content: [{ type: 'text' as const, text: lines.join('\n') }] };
   }
@@ -101,9 +100,9 @@ server.tool(
 
 server.tool(
   'save_session',
-  'Save the current session context for a project. Call this at the end of a session or at any checkpoint. Writes to ~/.sc/sessions/ — does not modify your repo. Pinned decisions (set via pin_decision mid-session) are permanent and survive session pruning; the sessions saved here are kept for a rolling window of recent history. Example: save_session({ status: "Sign-in page built, sign-up halfway done", decisions: ["Chose email-only auth — social login out of scope"], next_steps: ["Finish sign-up form", "Add validation", "Wire to Supabase"], blockers: "None", branch: "feature/auth" })',
+  'Save the current session context for a project. Call this at the end of a session or at any checkpoint. Writes to ~/.sc/sessions/ — does not modify your repo. Only the last 3 sessions are kept. This is for "where we left off" state; durable architectural decisions belong in Claude\'s memory instead. Example: save_session({ status: "Sign-in page built, sign-up halfway done", decisions: ["Chose email-only auth — social login out of scope"], next_steps: ["Finish sign-up form", "Add validation", "Wire to Supabase"], blockers: "None", branch: "feature/auth" })',
   {
-    project_path: z.string().describe('Absolute path to the project root. Defaults to current working directory.').optional(),
+    project_path: z.string().describe('Absolute path to the specific project\'s root (not a parent folder holding several projects). Defaults to current working directory.').optional(),
     status: z.string().min(1, 'status cannot be empty').describe('One sentence: what was being worked on and where things stand. Required.'),
     decisions: z.array(z.string()).describe('Key decisions made this session, each with the reason why. (optional)').optional(),
     next_steps: z.array(z.string()).describe('Ordered list of what to do next session, most important first. (optional)').optional(),
@@ -111,7 +110,7 @@ server.tool(
     branch: z.string().describe('Current git branch. (optional — auto-detected from git if omitted)').optional(),
   },
   async ({ project_path, status, decisions, next_steps, blockers, branch }) => {
-    const resolvedPath = project_path || process.cwd();
+    const resolvedPath = loadStore(project_path || process.cwd()).path;
     const resolvedBranch = branch || detectBranch(resolvedPath);
 
     const entry = {
@@ -136,24 +135,6 @@ server.tool(
     ].filter(Boolean).join('\n');
 
     return { content: [{ type: 'text' as const, text: summary }] };
-  }
-);
-
-// ── pin_decision ─────────────────────────────────────────────────────────────
-
-server.tool(
-  'pin_decision',
-  'Pin a mid-session decision so it persists even if save_session is never called. Use this the moment a meaningful architectural or product choice is made — do not wait until the end of the session. Unlike save_session (which keeps a rolling window of recent history), pinned decisions persist indefinitely and are never pruned. Writes to ~/.sc/sessions/ — does not modify your repo.',
-  {
-    project_path: z.string().describe('Absolute path to the project root. Defaults to current working directory.').optional(),
-    decision: z.string().describe('The decision to record. Include the "why" — e.g. "Chose X over Y because Z."'),
-  },
-  async ({ project_path, decision }) => {
-    const resolvedPath = project_path || process.cwd();
-    addPinnedDecision(resolvedPath, decision);
-    return {
-      content: [{ type: 'text' as const, text: `Pinned: "${decision}" — persists even if save_session isn't called this session.` }],
-    };
   }
 );
 
@@ -222,9 +203,6 @@ server.tool(
       if (last) {
         lines.push(`  Last session: ${last.timestamp}`);
         lines.push(`  Status: ${last.status}`);
-      }
-      if (p.pinned?.length) {
-        lines.push(`  Pinned decisions: ${p.pinned.length}`);
       }
       lines.push('');
     });

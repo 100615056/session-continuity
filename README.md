@@ -89,7 +89,6 @@ Claude calls the MCP tools — you do nothing.
 |---|---|---|
 | `load_session` | Session start | Restores context — status, decisions, next steps, branch |
 | `save_session` | Session end | Captures a snapshot of what happened — status, decisions, next steps, blockers, branch. Example: `save_session({ status: "Auth done", decisions: ["JWT over sessions"], next_steps: ["Add refresh tokens"], blockers: "None" })` |
-| `pin_decision` | Mid-session | Records key architectural choices the moment they're made — persists even if `save_session` is never called |
 | `list_projects` | On demand | Shows all projects with session history and last-saved timestamps |
 | `delete_session_permanently` | On demand | Fully erases Claude's memory of a project — irreversible, no undo |
 
@@ -121,9 +120,8 @@ Blockers: None
 - **Status narrative** — one sentence on where things stand
 - **Decisions + why** — key choices made this session with reasoning
 - **Next steps** — ordered, most important first
-- **Pinned decisions** — architectural choices that survive the rolling window
 
-Up to 3 sessions are kept. Older sessions roll off. Pinned decisions never expire.
+Up to 3 sessions are kept. `load_session` shows the last one in full and earlier ones as a single line each. Older sessions roll off.
 
 ---
 
@@ -145,11 +143,9 @@ Up to 3 sessions are kept. Older sessions roll off. Pinned decisions never expir
 
 ---
 
-## `pin_decision` vs `save_session`
+## Where do architectural decisions go?
 
-`save_session` is a snapshot at the end of a session. `pin_decision` is a safety net during one — it records a choice the moment it's made so it's safe even if the session ends unexpectedly. Pinned decisions also never get pruned; they persist indefinitely, unlike session history which rolls off after 3 sessions.
-
-Call it as soon as you reach a meaningful fork. Claude does this automatically.
+Not here. session-continuity holds *continuation state*: where you left off and what's next. Durable decisions ("chose X over Y because Z") belong in Claude Code's built-in memory, which is designed to keep them long-term. `pin_decision` was removed in 0.4.0 for this reason: decisions stored in both places grew without limit and were replayed on every load.
 
 ## `delete_session_permanently`
 

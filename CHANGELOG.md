@@ -4,6 +4,15 @@ All notable changes to this project will be documented in this file.
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.4.0] - 2026-10-11
+
+### Removed
+- **`pin_decision`** — durable decisions belong in Claude Code's built-in memory. Pinned decisions stored in both places grew without limit and were replayed on every `load_session`. Existing pinned entries stay on disk but are no longer shown.
+
+### Changed
+- `load_session` shows the last session in full and earlier sessions as one line each.
+- Project paths are canonicalized (resolved, symlinks followed, trailing slash removed) before hashing, so the same directory always maps to the same store.
+
 ## [0.3.0] - 2026-06-21
 
 ### Added

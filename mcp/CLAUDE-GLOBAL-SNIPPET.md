@@ -1,10 +1,10 @@
 # Session continuity
 
-You have access to a `session-continuity` MCP server with four tools: `load_session`, `save_session`, `pin_decision`, and `list_projects`.
+You have access to a `session-continuity` MCP server for picking up where you left off. The main tools are `load_session` and `save_session`.
 
-**At the start of every session:** Call `load_session` with the current project path to restore context from the previous session. Briefly acknowledge what you found (or note it's a fresh start).
+**At the start of every session:** Call `load_session` with the specific project's root path (not a parent folder holding several projects) to restore context from the previous session. Briefly acknowledge what you found (or note it's a fresh start).
 
-**During a session:** When you or the developer make a meaningful architectural decision or choose one approach over another, call `pin_decision` to record it with the reasoning. Don't wait until the end.
+**During a session:** Record durable architectural decisions in Claude's memory, not in session-continuity.
 
 **At the end of a session (or when asked to save context):** Call `save_session` with:
 - `status`: one sentence on where things stand right now

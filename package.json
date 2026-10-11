@@ -1,6 +1,6 @@
 {
   "name": "session-continuity",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "mcpName": "io.github.100615056/session-continuity",
   "repository": {
     "type": "git",
@@ -18,7 +18,7 @@
   "scripts": {
     "build": "node build.js",
     "prepare": "node build.js",
-    "test": "node --experimental-strip-types --test 'src/*.test.ts'"
+    "test": "node --experimental-strip-types --test 'src/*.test.ts' 'mcp/*.test.ts'"
   },
   "engines": {
     "node": ">=18"
